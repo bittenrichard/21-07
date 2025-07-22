@@ -1,4 +1,4 @@
-export type PageKey = 'login' | 'dashboard' | 'new-screening' | 'results';
+export type PageKey = 'login' | 'signup' | 'dashboard' | 'new-screening' | 'results' | 'settings';
 
 export interface NavigationItem {
   key: PageKey;

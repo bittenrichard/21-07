@@ -1,7 +1,12 @@
 import { useState } from 'react';
-import { JobFormData, CreateJobRequest, JobPosting } from '../types';
+import { JobFormData, JobPosting } from '../types';
+import { baserow } from '../../../shared/services/baserowClient';
+import { useAuth } from '../../auth/hooks/useAuth';
+
+const VAGAS_TABLE_ID = '701'; // ID da tabela Vagas
 
 export const useJobForm = () => {
+  const { profile } = useAuth();
   const [formData, setFormData] = useState<JobFormData>({
     jobTitle: '',
     jobDescription: '',
@@ -10,6 +15,7 @@ export const useJobForm = () => {
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const updateField = (field: keyof JobFormData, value: string) => {
     setFormData(prev => ({
@@ -18,34 +24,35 @@ export const useJobForm = () => {
     }));
   };
 
-  const submitJob = async (): Promise<JobPosting> => {
-    setIsSubmitting(true);
-    
-    const jobRequest: CreateJobRequest = {
-      title: formData.jobTitle,
-      description: formData.jobDescription,
-      requiredSkills: formData.requiredSkills.split(',').map(s => s.trim()).filter(Boolean),
-      desiredSkills: formData.desiredSkills.split(',').map(s => s.trim()).filter(Boolean)
-    };
+  const submitJob = async (): Promise<JobPosting | null> => {
+    if (!profile) {
+      setError("Você precisa estar logado para criar uma vaga.");
+      return null;
+    }
 
-    // Simulação de criação de job
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    setIsSubmitting(true);
+    setError(null);
     
-    // Criar o objeto JobPosting completo
-    const newJob: JobPosting = {
-      id: Date.now().toString(), // ID único baseado no timestamp
-      title: jobRequest.title,
-      description: jobRequest.description,
-      requiredSkills: jobRequest.requiredSkills,
-      desiredSkills: jobRequest.desiredSkills,
-      createdAt: new Date(),
-      status: 'active',
-      candidateCount: 0,
-      averageScore: 0
-    };
-    
-    setIsSubmitting(false);
-    return newJob;
+    try {
+      const newJobData = {
+        titulo: formData.jobTitle,
+        descricao: formData.jobDescription,
+        requisitos_obrigatorios: formData.requiredSkills,
+        requisitos_desejaveis: formData.desiredSkills,
+        usuario: [profile.id]
+      };
+
+      const createdJob = await baserow.post(VAGAS_TABLE_ID, newJobData);
+      
+      setIsSubmitting(false);
+      return createdJob as JobPosting;
+
+    } catch (err) {
+      console.error("Erro ao criar vaga no Baserow:", err);
+      setError("Não foi possível criar a vaga. Tente novamente.");
+      setIsSubmitting(false);
+      return null;
+    }
   };
 
   const resetForm = () => {
@@ -60,6 +67,7 @@ export const useJobForm = () => {
   return {
     formData,
     isSubmitting,
+    error,
     updateField,
     submitJob,
     resetForm

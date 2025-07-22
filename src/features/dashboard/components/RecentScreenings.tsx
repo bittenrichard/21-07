@@ -1,6 +1,7 @@
 import React from 'react';
 import { Trash2, Eye, Search, Plus } from 'lucide-react';
 import { JobPosting } from '../../screening/types';
+import WelcomeEmptyState from './WelcomeEmptyState'; // 1. Importar o novo componente
 
 interface RecentScreeningsProps {
   jobs: JobPosting[];
@@ -19,9 +20,16 @@ const RecentScreenings: React.FC<RecentScreeningsProps> = ({
   searchTerm,
   setSearchTerm,
 }) => {
+  // 2. Lógica para decidir se devemos mostrar o estado de boas-vindas
+  //    Mostra apenas se não houver vagas E o usuário não estiver buscando nada
+  const showWelcomeState = jobs.length === 0 && searchTerm === '';
+
+  if (showWelcomeState) {
+    return <WelcomeEmptyState onNewScreening={onNewScreening} />;
+  }
+
   return (
     <div className="mt-8 bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-      {/* CABEÇALHO ATUALIZADO (SEM FILTROS DE STATUS) */}
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
         <h3 className="text-xl font-bold text-gray-800">Triagens</h3>
         <div className="flex flex-col md:flex-row items-center gap-3 w-full md:w-auto">
@@ -45,7 +53,6 @@ const RecentScreenings: React.FC<RecentScreeningsProps> = ({
         </div>
       </div>
 
-      {/* TABELA ATUALIZADA (SEM COLUNA DE STATUS) */}
       <div className="overflow-x-auto">
         <table className="w-full text-left">
           <thead>
@@ -76,9 +83,10 @@ const RecentScreenings: React.FC<RecentScreeningsProps> = ({
             ))}
           </tbody>
         </table>
-        {jobs.length === 0 && (
+        {/* 3. Lógica para quando uma busca não retorna resultados */}
+        {jobs.length === 0 && searchTerm !== '' && (
           <div className="text-center py-10 text-gray-500">
-            Nenhuma triagem encontrada.
+            Nenhuma triagem encontrada para "{searchTerm}".
           </div>
         )}
       </div>

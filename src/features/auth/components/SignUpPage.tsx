@@ -1,24 +1,24 @@
 import React from 'react';
-import LoginForm from './LoginForm';
-import { LoginCredentials } from '../types';
+import SignUpForm from './SignUpForm';
+import { SignUpCredentials } from '../types';
 
-interface LoginPageProps {
-  onLogin: (credentials: LoginCredentials) => void;
-  onNavigateSignUp: () => void;
+interface SignUpPageProps {
+  onSignUp: (credentials: SignUpCredentials) => void;
+  onNavigateLogin: () => void;
   isLoading?: boolean;
   error?: string | null;
 }
 
-const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onNavigateSignUp, isLoading, error }) => {
+const SignUpPage: React.FC<SignUpPageProps> = ({ onSignUp, onNavigateLogin, isLoading, error }) => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="max-w-md w-full space-y-8 bg-white p-10 rounded-xl shadow-md">
         <div>
           <h2 className="text-center text-3xl font-bold text-gray-900">
-            Recruta.<span className="text-indigo-600">AI</span>
+            Crie sua conta
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Faça login na sua conta para começar
+            E comece a otimizar suas contratações com IA.
           </p>
         </div>
         
@@ -28,11 +28,11 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onNavigateSignUp, isLoad
             </div>
         )}
 
-        <LoginForm onSubmit={onLogin} isLoading={isLoading} />
-        
+        <SignUpForm onSubmit={onSignUp} isLoading={isLoading} />
+
         <div className="text-sm text-center">
-            <button onClick={onNavigateSignUp} className="font-medium text-indigo-600 hover:text-indigo-500">
-              Não tem uma conta? Crie agora
+            <button onClick={onNavigateLogin} className="font-medium text-indigo-600 hover:text-indigo-500">
+              Já tem uma conta? Faça login
             </button>
         </div>
       </div>
@@ -40,4 +40,4 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onNavigateSignUp, isLoad
   );
 };
 
-export default LoginPage;
+export default SignUpPage;

@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '../../../shared/services/supabaseClient';
+import { useMemo } from 'react';
 import { JobPosting } from '../../screening/types';
+import { Candidate } from '../../results/types';
 
 export interface DashboardStats {
   activeJobs: number;
@@ -9,66 +9,30 @@ export interface DashboardStats {
   approvedCandidates: number;
 }
 
-export const useDashboardStats = (jobs: JobPosting[]) => {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+// O hook agora apenas calcula, não busca mais dados.
+export const useDashboardStats = (jobs: JobPosting[], candidates: Candidate[]) => {
+  const stats: DashboardStats = useMemo(() => {
+    const activeJobs = jobs.length;
+    const totalCandidates = candidates.length;
 
-  useEffect(() => {
-    const calculateStats = async () => {
-      if (!jobs) {
-        setIsLoading(false);
-        return;
-      }
+    const approvedCandidates = candidates.filter(
+      (c) => c.score && c.score >= 90
+    ).length;
 
-      setIsLoading(true);
-      setError(null);
+    let averageScore = 0;
+    if (totalCandidates > 0) {
+      const totalScore = candidates.reduce((acc, curr) => acc + (curr.score || 0), 0);
+      averageScore = Math.round(totalScore / totalCandidates);
+    }
 
-      try {
-        const activeJobsCount = jobs.length;
-        const totalCandidatesCount = jobs.reduce((acc, job) => acc + job.candidateCount, 0);
-        
-        const jobsWithCandidates = jobs.filter(job => job.candidateCount > 0);
-        let averageScore = 0;
-        if (jobsWithCandidates.length > 0) {
-          const totalAverageScore = jobsWithCandidates.reduce((acc, job) => acc + job.averageScore, 0);
-          averageScore = Math.round(totalAverageScore / jobsWithCandidates.length);
-        }
-
-        // --- AQUI ESTÁ A CORREÇÃO ---
-        // 1. Pegamos os títulos de todas as vagas ativas na sua lista.
-        const activeJobTitles = jobs.map(job => job.title);
-        
-        let approvedCount = 0;
-        // 2. Só executamos a busca se houver vagas para filtrar.
-        if (activeJobTitles.length > 0) {
-          const { count, error: approvedError } = await supabase
-            .from('triagens')
-            .select('*', { count: 'exact', head: true })
-            .gte('SCORE', 90)
-            .in('TRIAGEM', activeJobTitles); // 3. Filtramos a contagem para incluir apenas candidatos dessas vagas.
-
-          if (approvedError) throw approvedError;
-          approvedCount = count ?? 0;
-        }
-
-        setStats({
-          activeJobs: activeJobsCount,
-          totalCandidates: totalCandidatesCount,
-          averageScore: averageScore,
-          approvedCandidates: approvedCount,
-        });
-
-      } catch (err: any) {
-        console.error("Erro ao calcular estatísticas do dashboard:", err);
-        setError("Não foi possível carregar os dados do dashboard.");
-      } finally {
-        setIsLoading(false);
-      }
+    return {
+      activeJobs,
+      totalCandidates,
+      averageScore,
+      approvedCandidates,
     };
+  }, [jobs, candidates]);
 
-    calculateStats();
-  }, [jobs]);
-
-  return { stats, isLoading, error };
+  // Como o cálculo é instantâneo, não precisamos mais de isLoading ou error aqui.
+  return { stats };
 };

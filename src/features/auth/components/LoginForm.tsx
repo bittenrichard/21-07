@@ -7,8 +7,10 @@ interface LoginFormProps {
 }
 
 const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, isLoading = false }) => {
-  const [email, setEmail] = useState('recrutador@empresa.com');
-  const [password, setPassword] = useState('123456');
+  // --- AQUI ESTÁ A MUDANÇA ---
+  // Trocamos os valores fixos por strings vazias para iniciar os campos limpos.
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

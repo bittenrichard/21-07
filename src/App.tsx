@@ -2,167 +2,144 @@ import React, { useEffect, useCallback, useState } from 'react';
 import { useAuth } from './features/auth/hooks/useAuth';
 import { useNavigation } from './shared/hooks/useNavigation';
 import LoginPage from './features/auth/components/LoginPage';
+import SignUpPage from './features/auth/components/SignUpPage';
 import MainLayout from './shared/components/Layout/MainLayout';
 import DashboardPage from './features/dashboard/components/DashboardPage';
 import NewScreeningPage from './features/screening/components/NewScreeningPage';
 import ResultsPage from './features/results/components/ResultsPage';
+import SettingsPage from './features/settings/components/SettingsPage';
+import { LoginCredentials, SignUpCredentials } from './features/auth/types';
 import { JobPosting } from './features/screening/types';
-import { supabase } from './shared/services/supabaseClient';
+import { Candidate } from './features/results/types';
+import { baserow } from './shared/services/baserowClient';
 
-const initialJobs: JobPosting[] = [
-  { id: '1', title: 'Desenvolvedor Backend Pleno', description: '', requiredSkills: [], desiredSkills: [], createdAt: new Date(), status: 'active', candidateCount: 0, averageScore: 0 },
-  { id: '2', title: 'Engenheiro de Dados Sênior', description: '', requiredSkills: [], desiredSkills: [], createdAt: new Date(), status: 'active', candidateCount: 0, averageScore: 0 },
-  { id: '3', title: 'Product Manager', description: '', requiredSkills: [], desiredSkills: [], createdAt: new Date(), status: 'closed', candidateCount: 0, averageScore: 0 }
-];
+const VAGAS_TABLE_ID = '701';
+const CANDIDATOS_TABLE_ID = '702';
 
 function App() {
-  const { user, isAuthenticated, isLoading, login, logout } = useAuth();
-  const { currentPage, navigateTo } = useNavigation();
-  const [selectedJob, setSelectedJob] = useState<JobPosting | null>(null);
-  const [jobs, setJobs] = useState<JobPosting[]>(initialJobs);
+  const { 
+    profile, 
+    isAuthenticated, 
+    isLoading: isAuthLoading, 
+    error: authError,
+    signIn, 
+    signOut,
+    signUp 
+  } = useAuth();
 
-  const syncJobData = useCallback(async () => {
-    // Usamos a forma funcional do setJobs para garantir que estamos lendo o estado mais recente
-    setJobs(currentJobs => {
-      const fetchAndUpdate = async () => {
-        if (currentJobs.length === 0) return;
+  const { currentPage, navigateTo } = useNavigation(isAuthenticated ? 'dashboard' : 'login');
+  
+  const [jobs, setJobs] = useState<JobPosting[]>([]);
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [selectedJobId, setSelectedJobId] = useState<number | null>(null);
+  const [isDataLoading, setIsDataLoading] = useState(false);
 
-        const jobDataPromises = currentJobs.map(job => 
-          supabase
-            .from('triagens')
-            .select('SCORE', { count: 'exact' })
-            .eq('job_id', job.id)
-        );
+  const fetchAllData = useCallback(async () => {
+    if (!profile) return;
+    setIsDataLoading(true);
+    try {
+      const params = `?filter__field_usuario__contains=${profile.id}&sorts=-criado_em`;
+      const jobsPromise = baserow.get(VAGAS_TABLE_ID, params);
+      const candidatesPromise = baserow.get(CANDIDATOS_TABLE_ID, params);
 
-        try {
-          const results = await Promise.all(jobDataPromises);
-          
-          const updatedJobs = currentJobs.map((job, index) => {
-            const result = results[index];
-            const candidateCount = result.count ?? 0;
-            const candidates = result.data || [];
-            
-            let averageScore = 0;
-            if (candidateCount > 0) {
-              const totalScore = candidates.reduce((acc, curr) => acc + (curr.SCORE || 0), 0);
-              averageScore = Math.round(totalScore / candidateCount);
-            }
-
-            return { ...job, candidateCount, averageScore };
-          });
-          
-          setJobs(updatedJobs);
-        } catch (error) {
-          console.error("Erro ao sincronizar dados das vagas:", error);
-        }
-      };
+      const [jobsResult, candidatesResult] = await Promise.all([jobsPromise, candidatesPromise]);
       
-      fetchAndUpdate();
-      return currentJobs; // Retorna o estado atual imediatamente, a atualização virá depois
-    });
-  }, []);
+      setJobs(jobsResult.results || []);
+      setCandidates(candidatesResult.results || []);
+
+    } catch (error) {
+      console.error("Erro ao buscar dados do Baserow:", error);
+    } finally {
+      setIsDataLoading(false);
+    }
+  }, [profile]);
 
   useEffect(() => {
-    if (isAuthenticated) {
-      syncJobData();
+    if (isAuthenticated && profile) {
+      fetchAllData();
     }
-  }, [isAuthenticated, syncJobData]);
+  }, [isAuthenticated, profile, fetchAllData]);
 
-  const handleDeleteJob = async (jobId: string, jobTitle: string) => {
-    if (window.confirm(`Tem certeza que deseja excluir a triagem "${jobTitle}"? TODOS os candidatos associados serão permanentemente apagados.`)) {
-      try {
-        const { error } = await supabase.from('triagens').delete().eq('job_id', jobId);
-        if (error) throw error;
-        setJobs(prev => prev.filter(job => job.id !== jobId));
-      } catch (error) {
-        console.error("Erro ao deletar triagem:", error);
-        alert("Não foi possível excluir a triagem.");
-      }
-    }
+
+  const handleLogin = async (credentials: LoginCredentials) => {
+    await signIn(credentials);
   };
-
-  const handleLogin = async (credentials: { email: string; password: string }) => {
-    await login(credentials);
-    navigateTo('dashboard');
+  
+  const handleSignUp = async (credentials: SignUpCredentials) => {
+    await signUp(credentials);
+    alert('Cadastro realizado com sucesso! Agora você pode fazer login.');
+    navigateTo('login');
   };
 
   const handleLogout = () => {
-    logout();
+    signOut();
     navigateTo('login');
-    setSelectedJob(null);
   };
 
   const handleViewResults = (job: JobPosting) => {
-    setSelectedJob(job);
+    setSelectedJobId(job.id);
     navigateTo('results');
   };
 
   const handleJobCreated = (newJob: JobPosting) => {
-    // Usamos a forma funcional para garantir que estamos adicionando à lista mais recente
-    setJobs(prevJobs => [newJob, ...prevJobs]);
-    setSelectedJob(newJob);
+    setJobs(prev => [newJob, ...prev]);
+    setSelectedJobId(newJob.id);
     navigateTo('results');
   };
 
-  const handleCancel = () => {
-    navigateTo('dashboard');
-  };
-  
-  const onDeleteJobWithTitle = (jobId: string) => {
+  const handleDeleteJob = async (jobId: number) => {
       const jobToDelete = jobs.find(job => job.id === jobId);
-      if (jobToDelete) {
-          handleDeleteJob(jobId, jobToDelete.title);
+      if (jobToDelete && window.confirm(`Tem certeza que deseja excluir a triagem "${jobToDelete.titulo}"?`)) {
+          try {
+              await baserow.delete(VAGAS_TABLE_ID, jobId);
+              fetchAllData();
+          } catch (error) {
+              console.error("Erro ao deletar vaga:", error);
+              alert("Não foi possível excluir a vaga.");
+          }
       }
   };
 
-  const renderContent = () => {
-    switch (currentPage) {
-      case 'dashboard':
-        return (
-          <DashboardPage
-            jobs={jobs}
-            onViewResults={handleViewResults}
-            onDeleteJob={onDeleteJobWithTitle}
-            onNavigate={navigateTo}
-          />
-        );
-      case 'new-screening':
-        return (
-          <NewScreeningPage
-            onJobCreated={handleJobCreated}
-            onCancel={handleCancel}
-          />
-        );
-      case 'results':
-        return <ResultsPage selectedJob={selectedJob} onDataSynced={syncJobData} />;
-      default:
-        return (
-          <DashboardPage
-            jobs={jobs}
-            onViewResults={handleViewResults}
-            onDeleteJob={onDeleteJobWithTitle}
-            onNavigate={navigateTo}
-          />
-        );
-    }
-  };
-
+  if (isAuthLoading) {
+    return <div className="min-h-screen flex items-center justify-center bg-gray-100">Verificando sessão...</div>;
+  }
+  
   if (!isAuthenticated) {
     return (
       <div className="font-inter antialiased">
-        <LoginPage onLogin={handleLogin} isLoading={isLoading} />
+        {currentPage === 'signup' ? (
+            <SignUpPage onSignUp={handleSignUp} onNavigateLogin={() => navigateTo('login')} isLoading={isAuthLoading} error={authError} />
+        ) : (
+            <LoginPage onLogin={handleLogin} onNavigateSignUp={() => navigateTo('signup')} isLoading={isAuthLoading} error={authError} />
+        )}
       </div>
     );
   }
 
+  if (!profile || isDataLoading) {
+    return <div className="min-h-screen flex items-center justify-center bg-gray-100">Carregando seus dados...</div>;
+  }
+  
+  const selectedJob = jobs.find(job => job.id === selectedJobId) || null;
+
+  const renderContent = () => {
+    switch (currentPage) {
+      case 'dashboard':
+        return <DashboardPage jobs={jobs} candidates={candidates} onViewResults={handleViewResults} onDeleteJob={handleDeleteJob} onNavigate={navigateTo} />;
+      case 'new-screening':
+        return <NewScreeningPage onJobCreated={handleJobCreated} onCancel={() => navigateTo('dashboard')} />;
+      case 'results':
+        return <ResultsPage selectedJob={selectedJob} onDataSynced={fetchAllData} />;
+      case 'settings':
+        return <SettingsPage />;
+      default:
+        return <DashboardPage jobs={jobs} candidates={candidates} onViewResults={handleViewResults} onDeleteJob={handleDeleteJob} onNavigate={navigateTo} />;
+    }
+  };
+
   return (
     <div className="font-inter antialiased">
-      <MainLayout
-        currentPage={currentPage}
-        user={user}
-        onNavigate={navigateTo}
-        onLogout={handleLogout}
-      >
+      <MainLayout currentPage={currentPage} user={profile} onNavigate={navigateTo} onLogout={handleLogout}>
         {renderContent()}
       </MainLayout>
     </div>

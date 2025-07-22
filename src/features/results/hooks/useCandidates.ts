@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Candidate } from '../types';
-import { supabase } from '../../../shared/services/supabaseClient';
+import { baserow } from '../../../shared/services/baserowClient';
 
-// O hook agora espera o ID da vaga (jobId)
-export const useCandidates = (jobId?: string) => {
+const CANDIDATOS_TABLE_ID = '702'; // ID da tabela Candidatos
+
+export const useCandidates = (jobId?: number) => {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -19,21 +20,13 @@ export const useCandidates = (jobId?: string) => {
     setError(null);
 
     try {
-      // AQUI ESTÁ A MUDANÇA: Filtramos por 'job_id'
-      const { data, error } = await supabase
-        .from('triagens')
-        .select('*')
-        .eq('job_id', jobId) // <-- LÓGICA CORRIGIDA
-        .order('DATA', { ascending: false });
+      const params = `?filter__field_vaga__contains=${jobId}&sorts=-data_triagem`;
+      const { results } = await baserow.get(CANDIDATOS_TABLE_ID, params);
 
-      if (error) {
-        throw error;
-      }
-
-      setCandidates(data || []);
+      setCandidates(results || []);
     } catch (err: any) {
-      console.error('Erro ao buscar triagens:', err);
-      setError('Não foi possível carregar o histórico de triagens.');
+      console.error('Erro ao buscar candidatos no Baserow:', err);
+      setError('Não foi possível carregar o histórico de candidatos.');
     } finally {
       setIsLoading(false);
     }

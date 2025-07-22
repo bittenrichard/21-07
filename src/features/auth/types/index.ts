@@ -1,9 +1,11 @@
-export interface User {
-  id: string;
-  name: string;
+// Tipos para o fluxo de autenticação, agora mais genéricos
+
+export interface UserProfile {
+  id: number; // O ID numérico do Baserow
+  nome: string;
   email: string;
-  company: string;
-  avatar: string;
+  empresa: string;
+  avatar_url: string | null;
 }
 
 export interface LoginCredentials {
@@ -11,8 +13,14 @@ export interface LoginCredentials {
   password: string;
 }
 
+export interface SignUpCredentials extends LoginCredentials {
+  nome: string;
+  empresa: string;
+}
+
+// O estado de autenticação agora guarda apenas o perfil do usuário
 export interface AuthState {
-  user: User | null;
+  profile: UserProfile | null;
   isAuthenticated: boolean;
   isLoading: boolean;
 }
